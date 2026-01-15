@@ -26,6 +26,7 @@ The lab utilizes a Manager-Agent model to centralize security data:
 * **Memory**: Minimum 4GB RAM allocated to the Ubuntu VM for stable operation.
 
 ---
+<img width="1600" height="686" alt="image" src="https://github.com/user-attachments/assets/22fb0fb7-3e08-465b-9f95-1b1774385ffd" />
 
 ## 🚀 Detailed Build Commands
 
