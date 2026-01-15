@@ -1,164 +1,138 @@
-# 🛡️ Mini SOC Lab – SIEM-Based Detection & Incident Response
+# 🛡️ Cross-Platform SOC Lab: Wazuh EDR Deployment & FIM
 
 ## 📖 Overview
 
-This project demonstrates a **mini Security Operations Center (SOC)** environment built on a single Linux system using **Wazuh SIEM**.
-The lab simulates how security teams **detect, analyze, and respond** to suspicious system activity using log-based detection, alerting, and investigation workflows.
-
-The focus of this project is **security operations and decision-making**, not just log collection.
+This project demonstrates the end-to-end implementation of a **Security Operations Center (SOC)** environment. It features a centralized **Wazuh Manager** (Ubuntu) and a **Windows 11 Endpoint Agent**. The lab is designed to provide hands-on experience in log analysis, real-time file monitoring, and cross-platform security orchestration.
 
 ---
 
-## 🎯 Objectives
+## 🏗️ Lab Architecture
 
-* Build a lightweight SOC lab under **8 GB RAM constraints**
-* Collect and analyze system security logs
-* Design and validate custom detection rules
-* Generate alerts for suspicious behavior
-* Perform SOC-style investigation and incident reporting
-* Map detections to **MITRE ATT&CK**
+The lab utilizes a Manager-Agent model to centralize security data:
+
+| Component | Host System | Role |
+| --- | --- | --- |
+| **Wazuh Manager** | Ubuntu Server (VirtualBox) | Collects, analyzes, and stores security data from agents. |
+| **Wazuh Agent** | Windows 11 (Host Machine) | Sends logs and system events to the manager. |
+| **Network** | Bridged Adapter | Connects host and guest on the same network subnet. |
 
 ---
 
-## 🏗️ Architecture
+## 🛠️ Prerequisites
 
-**Environment**
+* **Virtualization**: [VirtualBox](https://www.virtualbox.org/) installed.
+* **Ubuntu Server**: 20.04+ ISO installed in VirtualBox with **Bridged Networking**.
+* **Administrative Access**: Required on the Windows host machine.
+* **Memory**: Minimum 4GB RAM allocated to the Ubuntu VM for stable operation.
 
-* OS: Kali Linux
-* SIEM: Wazuh (Single-node: Manager + Dashboard + Agent)
-* Monitoring Mode: Localhost (agent-based)
+---
 
-**Data Sources**
+## 🚀 Detailed Build Commands
 
-* Authentication logs (`/var/log/auth.log`)
-* File Integrity Monitoring (critical system directories)
-* Privilege escalation attempts
+### 1. Wazuh Manager Setup (Ubuntu)
+
+Run these commands in your Ubuntu terminal to install the central monitoring server.
+
+**Step 1: Add Security GPG Keys**
+
+```bash
+curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | sudo gpg --dearmor -o /usr/share/keyrings/wazuh-archive-keyring.gpg
 
 ```
-[ System Activity ]
-        ↓
-[ Wazuh Agent ]
-        ↓
-[ Wazuh Manager ]
-        ↓
-[ Detection Rules ]
-        ↓
-[ Alerts & Dashboards ]
-        ↓
-[ SOC Investigation & Report ]
-```
 
----
+**Step 2: Run the Installation Script**
 
-## 🔍 Detection Scenarios Implemented
-
-### 1️⃣ SSH Brute-Force Attempt
-
-* **Behavior**: Multiple failed authentication attempts
-* **Detection**: Threshold-based alert
-* **MITRE ATT&CK**: T1110 – Brute Force
-* **Severity**: High
-
-### 2️⃣ Suspicious File Creation
-
-* **Behavior**: Unauthorized file creation in temporary directory
-* **Detection**: File Integrity Monitoring
-* **Severity**: Medium
-
-### 3️⃣ Privilege Escalation Attempt
-
-* **Behavior**: Repeated sudo authentication attempts
-* **Detection**: Privilege-related log analysis
-* **Severity**: Medium
-
----
-
-## 🚨 Alerting & Dashboards
-
-* Custom Wazuh rules for security detection
-* Severity-based alert classification
-* Dashboards for:
-
-  * Authentication failures
-  * Alerts by severity
-  * Top affected users
-
-Dashboards are intentionally minimal, reflecting **real SOC environments**.
-
----
-
-## 🧪 SOC Incident Workflow
-
-Each alert follows a standard SOC process:
-
-1. **Detection** – Alert triggered by rule
-2. **Triage** – Initial severity assessment
-3. **Investigation** – Log correlation and context analysis
-4. **Impact Assessment** – Risk evaluation
-5. **Response Recommendation** – Suggested containment actions
-6. **Incident Report** – Documentation of findings
-
----
-
-## 📄 Sample Incident Report
+```bash
+curl -sO https://packages.wazuh.com/4.12/wazuh-install.sh && sudo bash ./wazuh-install.sh -a -i
 
 ```
-Alert: SSH Brute Force Detected
-Severity: High
-Source: Localhost
-Target User: root
-Evidence: Multiple failed authentication attempts within a short time window
-MITRE ATT&CK: T1110
-Impact: Potential credential compromise
-Recommended Action: Lock affected account and block source IP
+
+* `-a`: Installs all components (Manager, Indexer, Dashboard).
+* `-i`: Runs the script in interactive mode.
+* **Note**: Save the admin credentials provided at the end of the script!
+
+---
+
+### 2. Agent Registration & Troubleshooting
+
+After installing the Windows MSI agent, use these commands to link the endpoint to the manager.
+
+**Step 1: Generate the Agent Key (Ubuntu)**
+
+```bash
+sudo /var/ossec/bin/manage_agents
+
+```
+
+* Select **`A`** to add an agent (e.g., Name: `Windows-Host`).
+* Select **`E`** to extract the key for the new ID (e.g., `005`).
+* Copy the resulting long character string.
+
+**Step 2: Solve "Duplicate Agent" Issues**
+If you encounter a `Duplicate agent name` error, force-delete the old record:
+
+```bash
+sudo /var/ossec/bin/manage_agents -r <OLD_ID>
+sudo rm -f /var/ossec/queue/rids/*
+sudo systemctl restart wazuh-manager
+
+```
+
+**Step 3: Apply Key on Windows**
+
+1. Open **Wazuh Agent Manager GUI**.
+2. Paste the key and enter the **Ubuntu Manager IP**.
+3. Click **Save** and **Restart** the service.
+
+---
+
+### 3. File Integrity Monitoring (FIM)
+
+Configure the agent to watch for unauthorized file changes in real-time.
+
+**Step 1: Edit Configuration**
+Open `C:\Program Files (x86)\ossec-agent\ossec.conf` as Administrator and add the monitoring directory:
+
+```xml
+<syscheck>
+  <directories realtime="yes">C:\Users\YourUser\ImportantFolder</directories>
+</syscheck>
+
+```
+
+**Step 2: Restart the Agent (PowerShell Admin)**
+
+```powershell
+Restart-Service wazuhsvc
+
 ```
 
 ---
 
-## 🧠 Key Learnings
+## 📊 Verification & Results
 
-* Difference between raw logs and actionable alerts
-* Importance of detection logic and thresholds
-* SOC alert triage and investigation workflow
-* Practical use of MITRE ATT&CK in incident analysis
-* How SIEM tools support security decision-making
+1. **Dashboard**: Navigate to `https://<ubuntu-ip>`.
+2. **Status**: Go to **Agents**; ensure `Windows-Host` shows as **Active**.
+3. **Alerting**: Create a file in your monitored folder. Navigate to **Integrity Monitoring** to view the real-time detection alert.
 
 ---
 
-## 🚀 Future Improvements
+## 📂 Repository Structure
 
-* Add Windows endpoint with Sysmon
-* Monitor remote hosts
-* Advanced correlation rules
-* Integration with ticketing systems (SOC automation)
-* Threat intelligence enrichment
-
----
-
-## 📌 Disclaimer
-
-This project is for **educational and defensive security purposes only**.
-All activities are performed in a controlled lab environment.
-
----
-
-## 📂 Recommended Repo Structure
+```text
+soc-lab/
+├── docs/                   # PDFs and official lab guides
+├── screenshots/            # Screenshots of active dashboards and alerts
+├── configuration/          # Custom ossec.conf and rule backups
+└── README.md               # Detailed project documentation
 
 ```
-mini-soc-wazuh-lab/
-│
-├── README.md
-├── architecture/
-│   └── soc-lab-diagram.png
-├── detections/
-│   └── custom-wazuh-rules.xml
-├── incident-reports/
-│   └── ssh-bruteforce-report.md
-└── screenshots/
-    ├── dashboard.png
-    ├── alert.png
-```
-
-📌 **Screenshots matter** — they prove it actually works.
 
 ---
+
+## 📌 Final Takeaway
+
+This project successfully moved from a single-node setup to a functional **Enterprise EDR model**. By resolving registration loops and implementing real-time FIM, this lab demonstrates a robust workflow for SOC incident detection and host monitoring.
+
+while trying to build this project i tried to write about the problem i faced here is the link for the writeup 
+** https://github.com/damnkrishna/CyberGaurd-j/blob/main/daily-notes/2026-01-14-soc-lab-attempt.md **
